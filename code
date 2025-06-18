@@ -43,7 +43,7 @@ subprocess.Popen([
     '--remote-debugging-port=9222',
     '--user-data-dir=C:\\Users\\SHABAN\\AppData\\Local\\Google\\Chrome\\User Data',
     '--profile-directory=Profile 1',
-    'https://www.linkedin.com/in/riteshagar/'
+    'https://www.linkedin.com/in/aditya-ghosh-145569170/'
 ], shell=True)
 
 # Step 2: Wait for browser to fully load
@@ -78,23 +78,43 @@ pyautogui.hotkey("ctrl", "c")   # Copy
 time.sleep(3)
 
 import json
-
-import json
-
 # Step 7: Read clipboard
 page_content = pyperclip.paste()
 
 if page_content.strip():
-    print(" Page content successfully copied.")
+    print(" Page content copied.")
 
-    # Wrap content in a dictionary
-    data = {
-        "url": "https://www.linkedin.com/in/anupammittal007/",
+    # Extract email and phone from copied content
+    import re
+    import json
+
+    extracted_data = {
+        "url": "https://www.linkedin.com/in/ankit-tandon-7455429/",
         "content": page_content
     }
 
-    # Print JSON to terminal
-    print(json.dumps(data, indent=4, ensure_ascii=False))
+    content = extracted_data["content"]
+
+    # Extract emails
+    emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
+
+    # Extract and clean phone numbers
+    raw_phones = re.findall(r"\+\d[\d\s\-()]{7,}", content)
+    phones = [p.strip() for p in raw_phones]
+
+    # Show as JSON in terminal
+    print("\n Extracted JSON:")
+    output = {
+        "url": "https://www.linkedin.com/in/aditya-ghosh-145569170/",
+        "emails": emails,
+        "phones": phones
+    }
+
+    print(json.dumps(output, indent=4))
+
+
 else:
-    print(" Clipboard is empty! Data was not copied.")
+    print(" Clipboard is empty! Page content not copied.")
+
+
 
