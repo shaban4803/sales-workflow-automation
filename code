@@ -60,7 +60,7 @@ try:
     if try_click_with_timeout('apollo_button_email.png', timeout=9):
         time.sleep(3)
 except Exception as e:
-    print(f"⚠ Email click failed: {e}")
+    print(f"Email click failed: {e}")
 
 try:
     if try_click_with_timeout('apollo_button_phone.png', timeout=9):
@@ -77,11 +77,24 @@ time.sleep(1)
 pyautogui.hotkey("ctrl", "c")   # Copy
 time.sleep(3)
 
-# Step 7: Save clipboard contents to file
+import json
+
+import json
+
+# Step 7: Read clipboard
 page_content = pyperclip.paste()
+
 if page_content.strip():
-    with open("linkedin_profile_dump.txt", "w", encoding="utf-8") as f:
-        f.write(page_content)
-    print(" Page content saved to 'linkedin_profile_dump.txt'")
+    print(" Page content successfully copied.")
+
+    # Wrap content in a dictionary
+    data = {
+        "url": "https://www.linkedin.com/in/anupammittal007/",
+        "content": page_content
+    }
+
+    # Print JSON to terminal
+    print(json.dumps(data, indent=4, ensure_ascii=False))
 else:
-    print(" Clipboard is empty — copy likely failed.")
+    print(" Clipboard is empty! Data was not copied.")
+
