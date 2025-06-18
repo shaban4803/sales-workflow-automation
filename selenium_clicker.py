@@ -11,14 +11,14 @@ def wait_until_found_and_click(image_name, confidence=0.8):
             if location:
                 pyautogui.moveTo(pyautogui.center(location), duration=0.5)
                 pyautogui.click()
-                print(f"✅ Clicked: {image_name}")
+                print(f" Clicked: {image_name}")
                 return
         except Exception as e:
-            print(f"❌ Error locating {image_name}: {e}")
+            print(f" Error locating {image_name}: {e}")
         time.sleep(1)
 
 def try_click_with_timeout(image_name, timeout=16, confidence=0.8):
-    print(f"⏳ Trying to find '{image_name}' for up to {timeout} seconds...")
+    print(f" Trying to find '{image_name}' for up to {timeout} seconds...")
     start_time = time.time()
     while (time.time() - start_time) < timeout:
         try:
@@ -26,16 +26,16 @@ def try_click_with_timeout(image_name, timeout=16, confidence=0.8):
             if location:
                 pyautogui.moveTo(pyautogui.center(location), duration=0.5)
                 pyautogui.click()
-                print(f"✅ Clicked: {image_name}")
+                print(f" Clicked: {image_name}")
                 return True
         except Exception as e:
-            print(f"❌ Error locating {image_name}: {e}")
+            print(f" Error locating {image_name}: {e}")
         time.sleep(1)
-    print(f"⏱️ '{image_name}' not found within {timeout}s.")
+    print(f"⏱ '{image_name}' not found within {timeout}s.")
     return False
 
 # Step 1: Launch Chrome with LinkedIn profile using correct profile directory
-print("🚀 Launching Chrome with LinkedIn Profile...")
+print(" Launching Chrome with LinkedIn Profile...")
 subprocess.Popen([
     'start', 'chrome',
     '--remote-debugging-port=9222',
