@@ -1,0 +1,87 @@
+import pyautogui
+import subprocess
+import time
+import pyperclip
+
+pyautogui.FAILSAFE = False
+
+def wait_until_found_and_click(image_name, confidence=0.8):
+    print(f" Waiting for '{image_name}'...")
+    while True:
+        try:
+            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
+            if location:
+                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+                pyautogui.click()
+                print(f" Clicked: {image_name}")
+                return
+        except Exception as e:
+            print(f" Error locating {image_name}: {e}")
+        time.sleep(1)
+
+def try_click_with_timeout(image_name, timeout=9, confidence=0.8):
+    print(f" Trying '{image_name}' for {timeout}s...")
+    start_time = time.time()
+    while (time.time() - start_time) < timeout:
+        try:
+            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
+            if location:
+                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+                pyautogui.click()
+                print(f" Clicked: {image_name}")
+                return True
+        except Exception as e:
+            print(f" Error locating {image_name}: {e}")
+        time.sleep(1)
+    print(f"⏱ Timeout: '{image_name}' not found.")
+    return False
+
+# Step 1: Launch Chrome to specific LinkedIn profile
+print(" Launching LinkedIn in Chrome...")
+subprocess.Popen([
+    'start', 'chrome',
+    '--remote-debugging-port=9222',
+    '--user-data-dir=C:\\Users\\SHABAN\\AppData\\Local\\Google\\Chrome\\User Data',
+    '--profile-directory=Profile 1',
+    'https://www.linkedin.com/in/anupammittal007/'
+], shell=True)
+
+# Step 2: Wait for browser to fully load
+time.sleep(7)
+
+# Step 3: Wait for Apollo button and click
+wait_until_found_and_click('apollo_button.png')
+
+# Step 4: Wait for Apollo panel to expand
+time.sleep(9)
+
+# Step 5: Try revealing email and phone
+try:
+    if try_click_with_timeout('apollo_button_email.png', timeout=9):
+        time.sleep(3)
+except Exception as e:
+    print(f"⚠ Email click failed: {e}")
+
+try:
+    if try_click_with_timeout('apollo_button_phone.png', timeout=9):
+        time.sleep(3)
+except Exception as e:
+    print(f"⚠ Phone click failed: {e}")
+
+# Step 6: Select and copy entire page
+print(" Copying full page content...")
+pyautogui.click(1258, 319)  # Click on Apollo sidebar\
+time.sleep(1)
+pyautogui.hotkey("ctrl", "a")   # Select all
+time.sleep(1)
+pyautogui.hotkey("ctrl", "c")   # Copy
+time.sleep(3)
+
+# Step 7: Save clipboard contents to file
+page_content = pyperclip.paste()
+if page_content.strip():
+    with open("linkedin_profile_dump.txt", "w", encoding="utf-8") as f:
+        f.write(page_content)
+    print(" Page content saved to 'linkedin_profile_dump.txt'")
+else:
+    print(" Clipboard is empty — copy likely failed.")
