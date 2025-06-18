@@ -1,0 +1,63 @@
+import pyautogui
+pyautogui.FAILSAFE = False
+import subprocess
+import time
+
+def wait_until_found_and_click(image_name, confidence=0.8):
+    print(f"⏳ Waiting until '{image_name}' is found...")
+    while True:
+        try:
+            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
+            if location:
+                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+                pyautogui.click()
+                print(f"✅ Clicked: {image_name}")
+                return
+        except Exception as e:
+            print(f"❌ Error locating {image_name}: {e}")
+        time.sleep(1)
+
+def try_click_with_timeout(image_name, timeout=16, confidence=0.8):
+    print(f"⏳ Trying to find '{image_name}' for up to {timeout} seconds...")
+    start_time = time.time()
+    while (time.time() - start_time) < timeout:
+        try:
+            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
+            if location:
+                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+                pyautogui.click()
+                print(f"✅ Clicked: {image_name}")
+                return True
+        except Exception as e:
+            print(f"❌ Error locating {image_name}: {e}")
+        time.sleep(1)
+    print(f"⏱️ '{image_name}' not found within {timeout}s.")
+    return False
+
+# Step 1: Launch Chrome with LinkedIn profile using correct profile directory
+print("🚀 Launching Chrome with LinkedIn Profile...")
+subprocess.Popen([
+    'start', 'chrome',
+    '--remote-debugging-port=9222',
+    '--user-data-dir=C:\\Users\\SHABAN\\AppData\\Local\\Google\\Chrome\\User Data',
+    '--profile-directory=Profile 1',
+    'https://www.linkedin.com/in/anupammittal007/'
+], shell=True)
+
+# Step 2: Wait a few seconds to allow page to load
+time.sleep(5)
+
+# Step 3: Wait for and click the Apollo button
+wait_until_found_and_click('apollo_button.png')
+
+# Step 4: Wait for Apollo sidebar to finish loading
+time.sleep(16)
+
+# Step 5: Try clicking email and phone buttons
+email_clicked = try_click_with_timeout('apollo_button_email.png', timeout=16)
+if email_clicked:
+    time.sleep(9)
+
+phone_clicked = try_click_with_timeout('apollo_button_phone.png', timeout=16)
+if phone_clicked:
+    time.sleep(9)
