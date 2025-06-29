@@ -4,6 +4,7 @@ import time
 import pyperclip
 import json
 import re
+import requests
 
 pyautogui.FAILSAFE = False
 
@@ -90,9 +91,7 @@ def extract_from_current_tab(url):
 
 # List of LinkedIn profiles
 linkedin_profiles = [
-    "https://www.linkedin.com/in/aditya-ghosh-145569170/",
-    "https://www.linkedin.com/in/riteshagar/",
-    "https://www.linkedin.com/in/ahsan-aziz-90a72b75/"
+    "https://www.linkedin.com/in/shaphan-samuel-16257819/",
 ]
 
 # Launch Chrome with all profiles as tabs
@@ -107,9 +106,6 @@ subprocess.Popen([
 
 time.sleep(7)
 
-# Activate browser window
-pyautogui.hotkey("alt", "tab")
-time.sleep(2)
 
 results = []
 
@@ -124,6 +120,22 @@ for index, url in enumerate(linkedin_profiles):
         pyautogui.hotkey("ctrl", "tab")
         time.sleep(3)
 
-# Final JSON Output
+# Choose your webhook URL
+USE_TEST_URL = True  # Set to False for production
+WEBHOOK_URL = "http://localhost:5678/webhook-test/from-pyautogui" if USE_TEST_URL else "http://localhost:5678/webhook/from-pyautogui"
+
+# Final output
 print("\n Final Extracted JSON:")
 print(json.dumps(results, indent=4))
+
+# Send to n8n
+try:
+    response = requests.post(WEBHOOK_URL, json={"data": results})
+
+    if response.status_code == 200:
+        print(f" Successfully sent to n8n: {response.status_code}")
+    else:
+        print(f" Sent request but got unexpected status code: {response.status_code}")
+        print("Response text:", response.text)
+except Exception as e:
+    print(f" Failed to send data to n8n: {e}")
