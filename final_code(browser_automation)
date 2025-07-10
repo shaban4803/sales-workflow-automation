@@ -4,11 +4,11 @@ import time
 import pyperclip
 import json
 import re
-import requests
+import os
 
 pyautogui.FAILSAFE = False
 
-# Helper functions
+# --- Helper Functions ---
 def wait_until_found_and_click(image_name, confidence=0.8):
     print(f" Waiting for '{image_name}'...")
     while True:
@@ -37,11 +37,11 @@ def try_click_with_timeout(image_name, timeout=9, confidence=0.8):
         except Exception as e:
             print(f" Error locating {image_name}: {e}")
         time.sleep(1)
-    print(f"Timeout: '{image_name}' not found.")
+    print(f" Timeout: '{image_name}' not found.")
     return False
 
 def extract_from_current_tab(url):
-    print(f"Scraping: {url}")
+    print(f" Scraping: {url}")
     wait_until_found_and_click('apollo_button.png')
     time.sleep(9)
 
@@ -57,7 +57,7 @@ def extract_from_current_tab(url):
     except Exception as e:
         print(f" Phone click failed: {e}")
 
-    #Clear clipboard first
+    # Clear clipboard first
     pyperclip.copy("")
 
     print(" Copying page content...")
@@ -88,54 +88,62 @@ def extract_from_current_tab(url):
         "phones": phones
     }
 
+# --- Input Configuration ---
 
-# List of LinkedIn profiles
 linkedin_profiles = [
-    "https://www.linkedin.com/in/shaphan-samuel-16257819/",
+    "https://www.linkedin.com/in/sikander-sultan-90a5223a/",
+    "https://www.linkedin.com/in/filippocatalano/",
+    "https://www.linkedin.com/in/satyanadella/",
+    "https://www.linkedin.com/in/n-chandrasekaran/",
+    "https://www.linkedin.com/in/rishad-premji/",
+    "https://www.linkedin.com/in/n-chandrasekaran/",
+    "https://www.linkedin.com/in/sampleuser7/",
+    "https://www.linkedin.com/in/sampleuser8/",
 ]
 
-# Launch Chrome with all profiles as tabs
-print(" Opening all profiles in tabs...")
-subprocess.Popen([
-    'start', 'chrome',
-    '--remote-debugging-port=9222',
-    '--user-data-dir=C:\\Users\\SHABAN\\AppData\\Local\\Google\\Chrome\\User Data',
-    '--profile-directory=Profile 1',
-    *linkedin_profiles
-], shell=True)
-
-time.sleep(7)
-
+chrome_profiles = ["Profile 2", "Profile 2", "Profile 5"]
+CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
 
 results = []
 
-# Loop through tabs
-for index, url in enumerate(linkedin_profiles):
-    print(f"\n Tab {index + 1}: {url}")
-    result = extract_from_current_tab(url)
-    results.append(result)
+# --- Main Logic ---
 
-    # Switch to next tab (except after last one)
-    if index < len(linkedin_profiles) - 1:
-        pyautogui.hotkey("ctrl", "tab")
-        time.sleep(3)
+def chunk_list(lst, size):
+    """Split a list into chunks of size `size`"""
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
 
-# Choose your webhook URL
-USE_TEST_URL = True  # Set to False for production
-WEBHOOK_URL = "http://localhost:5678/webhook-test/from-pyautogui" if USE_TEST_URL else "http://localhost:5678/webhook/from-pyautogui"
+for i, profile_links in enumerate(chunk_list(linkedin_profiles, 3)):
+    chrome_profile = chrome_profiles[i % len(chrome_profiles)]
+    print(f"\n Opening Chrome with {chrome_profile} for links: {profile_links}")
 
-# Final output
+    # Launch Chrome with selected profile
+    chrome_process = subprocess.Popen([
+        'start', 'chrome',
+        '--remote-debugging-port=9222',
+        f'--user-data-dir={CHROME_USER_DIR}',
+        f'--profile-directory={chrome_profile}',
+        *profile_links
+    ], shell=True)
+
+    # Wait for Chrome to fully load
+    time.sleep(10)
+
+    # Loop through the open tabs
+    for index, url in enumerate(profile_links):
+        print(f"\n  Tab {index + 1}: {url}")
+        result = extract_from_current_tab(url)
+        results.append(result)
+
+        if index < len(profile_links) - 1:
+            pyautogui.hotkey("ctrl", "tab")
+            time.sleep(3)
+
+    # Close Chrome window (only the one we launched)
+    print(f"\n Closing Chrome window for {chrome_profile}")
+    os.system("taskkill /F /IM chrome.exe")
+    time.sleep(5)
+
+# --- Show Final Output Only ---
 print("\n Final Extracted JSON:")
 print(json.dumps(results, indent=4))
-
-# Send to n8n
-try:
-    response = requests.post(WEBHOOK_URL, json={"data": results})
-
-    if response.status_code == 200:
-        print(f" Successfully sent to n8n: {response.status_code}")
-    else:
-        print(f" Sent request but got unexpected status code: {response.status_code}")
-        print("Response text:", response.text)
-except Exception as e:
-    print(f" Failed to send data to n8n: {e}")
