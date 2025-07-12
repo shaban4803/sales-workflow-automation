@@ -5,145 +5,138 @@ import pyperclip
 import json
 import re
 import os
+import psycopg2
+import uuid
+from datetime import datetime
 
 pyautogui.FAILSAFE = False
 
-# --- Helper Functions ---
-def wait_until_found_and_click(image_name, confidence=0.8):
-    print(f" Waiting for '{image_name}'...")
+# DB Connection
+conn = psycopg2.connect(
+    host="localhost",
+    port=5431,
+    database="postgres",
+    user="postgres",
+    password="mysecretpassword"
+)
+conn.autocommit = True
+cur = conn.cursor()
+
+CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
+chrome_profiles = ["Profile 2", "Profile 2", "Profile 5"]
+
+# --- DB Helpers ---
+def fetch_pending_profiles(limit=9):
+    cur.execute('SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE LIMIT %s', (limit,))
+    return cur.fetchall()
+
+def insert_email(email, people_id):
+    cur.execute(
+        'INSERT INTO "Staging"."Email" ("Id", "Email", "PeopleId", "CompanyId", "Uuid", "CreatedAt", "UpdatedAt") VALUES (%s, %s, %s, %s, %s, %s, %s)',
+        (str(uuid.uuid4()), email, people_id, None, str(uuid.uuid4()), datetime.utcnow(), datetime.utcnow())
+    )
+
+def insert_phone(phone, people_id):
+    cur.execute(
+        'INSERT INTO "Staging"."Contact" ("Id", "ContactNo", "PeopleId", "CompanyId", "Uuid", "CreatedAt", "UpdatedAt") VALUES (%s, %s, %s, %s, %s, %s, %s)',
+        (str(uuid.uuid4()), phone, people_id, None, str(uuid.uuid4()), datetime.utcnow(), datetime.utcnow())
+    )
+
+def mark_done(ids):
+    cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s', (tuple(ids),))
+
+# --- PyAutoGUI Helpers ---
+def wait_until_found_and_click(image, confidence=0.8):
     while True:
-        try:
-            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
-            if location:
-                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
-                pyautogui.click()
-                print(f" Clicked: {image_name}")
-                return
-        except Exception as e:
-            print(f" Error locating {image_name}: {e}")
+        location = pyautogui.locateOnScreen(image, confidence=confidence)
+        if location:
+            pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+            pyautogui.click()
+            return
         time.sleep(1)
 
-def try_click_with_timeout(image_name, timeout=9, confidence=0.8):
-    print(f" Trying '{image_name}' for {timeout}s...")
-    start_time = time.time()
-    while (time.time() - start_time) < timeout:
-        try:
-            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
-            if location:
-                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
-                pyautogui.click()
-                print(f" Clicked: {image_name}")
-                return True
-        except Exception as e:
-            print(f" Error locating {image_name}: {e}")
+def try_click_with_timeout(image, timeout=9, confidence=0.8):
+    start = time.time()
+    while time.time() - start < timeout:
+        location = pyautogui.locateOnScreen(image, confidence=confidence)
+        if location:
+            pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+            pyautogui.click()
+            return True
         time.sleep(1)
-    print(f" Timeout: '{image_name}' not found.")
     return False
 
 def extract_from_current_tab(url):
-    print(f" Scraping: {url}")
+    print(f"Scraping: {url}")
     wait_until_found_and_click('apollo_button.png')
     time.sleep(9)
 
-    try:
-        if try_click_with_timeout('apollo_button_email.png', timeout=9):
-            time.sleep(3)
-    except Exception as e:
-        print(f" Email click failed: {e}")
+    try_click_with_timeout('apollo_button_email.png', timeout=9)
+    try_click_with_timeout('apollo_button_phone.png', timeout=9)
 
-    try:
-        if try_click_with_timeout('apollo_button_phone.png', timeout=9):
-            time.sleep(3)
-    except Exception as e:
-        print(f" Phone click failed: {e}")
-
-    # Clear clipboard first
-    pyperclip.copy("")
-
-    print(" Copying page content...")
-    pyautogui.click(1258, 319)  # Apollo sidebar location
+    pyperclip.copy("")  # clear clipboard
+    pyautogui.click(1258, 319)  # Apollo sidebar
     time.sleep(1)
     pyautogui.hotkey("ctrl", "a")
     time.sleep(1)
     pyautogui.hotkey("ctrl", "c")
     time.sleep(2)
 
-    page_content = pyperclip.paste()
+    content = pyperclip.paste()
+    if not content.strip():
+        print("Clipboard empty.")
+        return [], []
 
-    if not page_content.strip():
-        print(" Clipboard is empty! Skipping...")
-        return {
-            "url": url,
-            "emails": [],
-            "phones": []
-        }
-
-    emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", page_content)
-    raw_phones = re.findall(r"\+\d[\d\s\-()]{7,}", page_content)
-    phones = [p.strip() for p in raw_phones]
-
-    return {
-        "url": url,
-        "emails": emails,
-        "phones": phones
-    }
-
-# --- Input Configuration ---
-
-linkedin_profiles = [
-    "https://www.linkedin.com/in/sikander-sultan-90a5223a/",
-    "https://www.linkedin.com/in/filippocatalano/",
-    "https://www.linkedin.com/in/satyanadella/",
-    "https://www.linkedin.com/in/n-chandrasekaran/",
-    "https://www.linkedin.com/in/rishad-premji/",
-    "https://www.linkedin.com/in/n-chandrasekaran/",
-    "https://www.linkedin.com/in/sampleuser7/",
-    "https://www.linkedin.com/in/sampleuser8/",
-]
-
-chrome_profiles = ["Profile 2", "Profile 2", "Profile 5"]
-CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
-
-results = []
-
-# --- Main Logic ---
+    emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
+    phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", content)]
+    return emails, phones
 
 def chunk_list(lst, size):
-    """Split a list into chunks of size `size`"""
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
-for i, profile_links in enumerate(chunk_list(linkedin_profiles, 3)):
-    chrome_profile = chrome_profiles[i % len(chrome_profiles)]
-    print(f"\n Opening Chrome with {chrome_profile} for links: {profile_links}")
+# --- Main ---
+profiles = fetch_pending_profiles()
+if not profiles:
+    print("No unprocessed profiles found.")
+    exit()
 
-    # Launch Chrome with selected profile
-    chrome_process = subprocess.Popen([
+for i, chunk in enumerate(chunk_list(profiles, 3)):
+    chrome_profile = chrome_profiles[i % len(chrome_profiles)]
+    urls = [row[1] for row in chunk]
+    ids = [row[0] for row in chunk]
+
+    print(f"\nLaunching Chrome profile: {chrome_profile} for URLs: {urls}")
+    subprocess.Popen([
         'start', 'chrome',
         '--remote-debugging-port=9222',
         f'--user-data-dir={CHROME_USER_DIR}',
         f'--profile-directory={chrome_profile}',
-        *profile_links
+        *urls
     ], shell=True)
 
-    # Wait for Chrome to fully load
-    time.sleep(10)
+    time.sleep(10)  # let chrome load
 
-    # Loop through the open tabs
-    for index, url in enumerate(profile_links):
-        print(f"\n  Tab {index + 1}: {url}")
-        result = extract_from_current_tab(url)
-        results.append(result)
+    for idx, (person_id, url) in enumerate(chunk):
+        print(f"\n[Tab {idx+1}] {url}")
+        emails, phones = extract_from_current_tab(url)
 
-        if index < len(profile_links) - 1:
+        print(f"Extracted {len(emails)} emails, {len(phones)} phones")
+        for email in emails:
+            insert_email(email, person_id)
+        for phone in phones:
+            insert_phone(phone, person_id)
+
+        if idx < len(chunk) - 1:
             pyautogui.hotkey("ctrl", "tab")
             time.sleep(3)
 
-    # Close Chrome window (only the one we launched)
-    print(f"\n Closing Chrome window for {chrome_profile}")
+    mark_done(ids)
+    print(f"Marked processed: {ids}")
+
     os.system("taskkill /F /IM chrome.exe")
     time.sleep(5)
 
-# --- Show Final Output Only ---
-print("\n Final Extracted JSON:")
-print(json.dumps(results, indent=4))
+cur.close()
+conn.close()
+print("Scraping completed.")
