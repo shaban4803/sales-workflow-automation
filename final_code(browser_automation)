@@ -8,10 +8,10 @@ import os
 import psycopg2
 import uuid
 from datetime import datetime
-
 pyautogui.FAILSAFE = False
 
 # DB Connection
+print(" Connecting to PostgreSQL...")
 conn = psycopg2.connect(
     host="localhost",
     port=5431,
@@ -21,49 +21,67 @@ conn = psycopg2.connect(
 )
 conn.autocommit = True
 cur = conn.cursor()
+print(" PostgreSQL connection successful.")
 
 CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
-chrome_profiles = ["Profile 2", "Profile 2", "Profile 5"]
+chrome_profiles = ["Profile 4", "Profile 4", "Profile 4"]
 
 # --- DB Helpers ---
 def fetch_pending_profiles(limit=9):
+    print(f" Fetching up to {limit} unprocessed profiles from Staging.People...")
     cur.execute('SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE LIMIT %s', (limit,))
-    return cur.fetchall()
+    rows = cur.fetchall()
+    print(f" Fetched {len(rows)} profiles.")
+    return rows
 
 def insert_email(email, people_id):
+    print(f" Inserting email: {email} for Person ID: {people_id}")
     cur.execute(
         'INSERT INTO "Staging"."Email" ("Id", "Email", "PeopleId", "CompanyId", "Uuid", "CreatedAt", "UpdatedAt") VALUES (%s, %s, %s, %s, %s, %s, %s)',
         (str(uuid.uuid4()), email, people_id, None, str(uuid.uuid4()), datetime.utcnow(), datetime.utcnow())
     )
 
 def insert_phone(phone, people_id):
+    print(f" Inserting phone: {phone} for Person ID: {people_id}")
     cur.execute(
         'INSERT INTO "Staging"."Contact" ("Id", "ContactNo", "PeopleId", "CompanyId", "Uuid", "CreatedAt", "UpdatedAt") VALUES (%s, %s, %s, %s, %s, %s, %s)',
         (str(uuid.uuid4()), phone, people_id, None, str(uuid.uuid4()), datetime.utcnow(), datetime.utcnow())
     )
 
 def mark_done(ids):
+    print(f" Marking people as processed: {ids}")
     cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s', (tuple(ids),))
 
 # --- PyAutoGUI Helpers ---
-def wait_until_found_and_click(image, confidence=0.8):
+def wait_until_found_and_click(image, confidence=0.6):
+    print(f" Waiting for image: {image}")
     while True:
-        location = pyautogui.locateOnScreen(image, confidence=confidence)
-        if location:
-            pyautogui.moveTo(pyautogui.center(location), duration=0.5)
-            pyautogui.click()
-            return
+        try:
+            location = pyautogui.locateOnScreen(image, confidence=confidence)
+            if location:
+                print(f" Found and clicking: {image}")
+                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+                pyautogui.click()
+                return
+        except Exception as e:
+            print(f" Error locating {image}: {e}")
         time.sleep(1)
 
-def try_click_with_timeout(image, timeout=9, confidence=0.8):
+def try_click_with_timeout(image, timeout=9, confidence=0.6):
+    print(f" Trying to click {image} for {timeout}s...")
     start = time.time()
     while time.time() - start < timeout:
-        location = pyautogui.locateOnScreen(image, confidence=confidence)
-        if location:
-            pyautogui.moveTo(pyautogui.center(location), duration=0.5)
-            pyautogui.click()
-            return True
+        try:
+            location = pyautogui.locateOnScreen(image, confidence=confidence)
+            if location:
+                print(f" Clicked: {image}")
+                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+                pyautogui.click()
+                return True
+        except Exception as e:
+            print(f" Error: {e}")
         time.sleep(1)
+    print(f" Timeout: {image} not found.")
     return False
 
 def extract_from_current_tab(url):
@@ -74,7 +92,7 @@ def extract_from_current_tab(url):
     try_click_with_timeout('apollo_button_email.png', timeout=9)
     try_click_with_timeout('apollo_button_phone.png', timeout=9)
 
-    pyperclip.copy("")  # clear clipboard
+    pyperclip.copy("")  # Clear clipboard
     pyautogui.click(1258, 319)  # Apollo sidebar
     time.sleep(1)
     pyautogui.hotkey("ctrl", "a")
@@ -84,7 +102,7 @@ def extract_from_current_tab(url):
 
     content = pyperclip.paste()
     if not content.strip():
-        print("Clipboard empty.")
+        print(" Clipboard empty.")
         return [], []
 
     emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
@@ -98,7 +116,7 @@ def chunk_list(lst, size):
 # --- Main ---
 profiles = fetch_pending_profiles()
 if not profiles:
-    print("No unprocessed profiles found.")
+    print(" No unprocessed profiles found.")
     exit()
 
 for i, chunk in enumerate(chunk_list(profiles, 3)):
@@ -106,7 +124,7 @@ for i, chunk in enumerate(chunk_list(profiles, 3)):
     urls = [row[1] for row in chunk]
     ids = [row[0] for row in chunk]
 
-    print(f"\nLaunching Chrome profile: {chrome_profile} for URLs: {urls}")
+    print(f"\n Launching Chrome profile: {chrome_profile} for URLs: {urls}")
     subprocess.Popen([
         'start', 'chrome',
         '--remote-debugging-port=9222',
@@ -115,16 +133,16 @@ for i, chunk in enumerate(chunk_list(profiles, 3)):
         *urls
     ], shell=True)
 
-    time.sleep(10)  # let chrome load
+    time.sleep(10)  # Let Chrome load
 
     for idx, (person_id, url) in enumerate(chunk):
-        print(f"\n[Tab {idx+1}] {url}")
-        emails, phones = extract_from_current_tab(url)
+        print(f"\n [Tab {idx+1}] {url}")
+        emails, phone = extract_from_current_tab(url)
 
-        print(f"Extracted {len(emails)} emails, {len(phones)} phones")
+        print(f" Extracted {len(emails)} emails, {len(phone)} phones")
         for email in emails:
             insert_email(email, person_id)
-        for phone in phones:
+        for phone in phone:
             insert_phone(phone, person_id)
 
         if idx < len(chunk) - 1:
@@ -132,11 +150,10 @@ for i, chunk in enumerate(chunk_list(profiles, 3)):
             time.sleep(3)
 
     mark_done(ids)
-    print(f"Marked processed: {ids}")
 
     os.system("taskkill /F /IM chrome.exe")
     time.sleep(5)
 
 cur.close()
 conn.close()
-print("Scraping completed.")
+print(" Scraping completed.")
