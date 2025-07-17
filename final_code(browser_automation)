@@ -1,141 +1,234 @@
+from datetime import datetime, timezone
 import pyautogui
 import subprocess
 import time
 import pyperclip
-import json
 import re
-import requests
+import os
+import psycopg2
 
 pyautogui.FAILSAFE = False
 
-# Helper functions
-def wait_until_found_and_click(image_name, confidence=0.8):
-    print(f" Waiting for '{image_name}'...")
+# PostgresSQL Connection
+print(" Connecting to postgres")
+conn = psycopg2.connect(
+    host="192.168.99.72",
+    port=5432,
+    database="BusinessDevelopmentWarehouse",
+    user="postgres",
+    password="axiom@0900"
+)
+conn.autocommit = True
+cur = conn.cursor()
+print("postgres connection successful.")
+
+import random
+
+# Correct Chrome User Data directory path
+CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
+
+# Define only the profiles that exist on your system
+chrome_profiles = ["Profile 2", "Profile 3", "Profile 4", "Profile 5", "Profile 6", "Profile 7", "Profile 8", "Profile 9"]
+
+# Shuffle to select randomly
+random.shuffle(chrome_profiles)
+
+# Pick one profile for current run
+chosen_profile = chrome_profiles.pop()
+
+# Final Chrome path with chosen profile
+chrome_path = rf"{CHROME_USER_DIR}\{chosen_profile}"
+
+# --- DB Logic (your original functions) ---
+def fetch_pending_profiles(limit=30):
+    print(f" Fetching up to {limit} unprocessed profiles from Staging.People...")
+    cur.execute(
+        'SELECT "Id", "LinkedIn" '
+        'FROM "Staging"."People" '
+        'WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL '
+        'LIMIT %s',
+        (limit,)
+    )
+    rows = cur.fetchall()
+    print(f" Fetched {len(rows)} profiles.")
+    return rows
+
+def insert_email(email, people_id):
+    cur.execute(
+        'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
+        (str(people_id),)
+    )
+    result = cur.fetchone()
+    if not result:
+        print(f"No company found for PeopleId: {people_id}")
+        return
+    company_id = result[0]
+    cur.execute(
+        '''
+        INSERT INTO "Staging"."Email"
+        ("Email", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
+        VALUES (%s, %s, %s, now(), now())
+        ''',
+        (email, str(people_id), str(company_id))
+    )
+    conn.commit()
+    print(f"Inserted email for PeopleId: {people_id}")
+
+def insert_phone(contact_no, people_id):
+    cur.execute(
+        'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
+        (str(people_id),)
+    )
+    result = cur.fetchone()
+    if not result:
+        print(f"No company found for PeopleId: {people_id}")
+        return
+    company_id = result[0]
+    cur.execute(
+        '''
+        INSERT INTO "Staging"."Contact"
+        ("ContactNumber", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
+        VALUES (%s, %s, %s, now(), now())
+        ''',
+        (contact_no, str(people_id), str(company_id))
+    )
+    conn.commit()
+    print(f"Inserted phone for PeopleId: {people_id}")
+
+def mark_done(ids):
+    print(f" Marking people as processed: {ids}")
+    cur.execute(
+        'UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s',
+        (tuple(ids),)
+    )
+
+# --- Credit Tracking Logic ---
+def update_credits(profile, total_emails, total_phones):
+    email_credits = total_emails * 2
+    phone_credits = total_phones * 8
+    total = email_credits + phone_credits
+    cur.execute(
+        '''
+        INSERT INTO "Staging"."ApolloCreditUsage"
+        ("ProfileName","EmailCredits","PhoneCredits","TotalCredits","CreatedAt")
+        VALUES (%s,%s,%s,%s,now())
+        ''',
+        (profile, email_credits, phone_credits, total)
+    )
+    conn.commit()
+    print(f"Logged credits for {profile}: emails={email_credits}, phones={phone_credits}, total={total}")
+
+# --- GUI Helpers (your original ones) ---
+def wait_until_found_and_click(image, confidence=0.6):
+    print(f" Waiting for image: {image}")
     while True:
         try:
-            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
-            if location:
-                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+            loc = pyautogui.locateOnScreen(image, confidence=confidence)
+            if loc:
+                pyautogui.moveTo(pyautogui.center(loc), duration=0.5)
                 pyautogui.click()
-                print(f" Clicked: {image_name}")
                 return
-        except Exception as e:
-            print(f" Error locating {image_name}: {e}")
+        except Exception:
+            pass
         time.sleep(1)
 
-def try_click_with_timeout(image_name, timeout=9, confidence=0.8):
-    print(f" Trying '{image_name}' for {timeout}s...")
-    start_time = time.time()
-    while (time.time() - start_time) < timeout:
+def try_click_with_timeout(image, timeout=9, confidence=0.6):
+    print(f" Trying click {image} for {timeout}s...")
+    end = time.time() + timeout
+    while time.time() < end:
         try:
-            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
-            if location:
-                pyautogui.moveTo(pyautogui.center(location), duration=0.5)
+            loc = pyautogui.locateOnScreen(image, confidence=confidence)
+            if loc:
+                pyautogui.moveTo(pyautogui.center(loc), duration=0.5)
                 pyautogui.click()
-                print(f" Clicked: {image_name}")
                 return True
-        except Exception as e:
-            print(f" Error locating {image_name}: {e}")
+        except Exception:
+            pass
         time.sleep(1)
-    print(f"Timeout: '{image_name}' not found.")
+    print(f" Timeout: {image} not found.")
     return False
 
+# --- Extraction Logic (unchanged) + credit detection ---
 def extract_from_current_tab(url):
     print(f"Scraping: {url}")
     wait_until_found_and_click('apollo_button.png')
     time.sleep(9)
+    try_click_with_timeout('apollo_button_email.png', timeout=9)
+    try_click_with_timeout('apollo_button_phone.png', timeout=9)
+    time.sleep(6)
 
-    try:
-        if try_click_with_timeout('apollo_button_email.png', timeout=9):
-            time.sleep(3)
-    except Exception as e:
-        print(f" Email click failed: {e}")
-
-    try:
-        if try_click_with_timeout('apollo_button_phone.png', timeout=9):
-            time.sleep(3)
-    except Exception as e:
-        print(f" Phone click failed: {e}")
-
-    #Clear clipboard first
     pyperclip.copy("")
-
-    print(" Copying page content...")
-    pyautogui.click(1258, 319)  # Apollo sidebar location
+    pyautogui.click(1258, 319)
     time.sleep(1)
     pyautogui.hotkey("ctrl", "a")
     time.sleep(1)
     pyautogui.hotkey("ctrl", "c")
     time.sleep(2)
 
-    page_content = pyperclip.paste()
+    clip = pyperclip.paste()
+    if not clip.strip():
+        print(" Clipboard empty.")
+        return [], [], clip
 
-    if not page_content.strip():
-        print(" Clipboard is empty! Skipping...")
-        return {
-            "url": url,
-            "emails": [],
-            "phones": []
-        }
+    emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", clip)
+    phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", clip)]
+    return emails, phones, clip
 
-    emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", page_content)
-    raw_phones = re.findall(r"\+\d[\d\s\-()]{7,}", page_content)
-    phones = [p.strip() for p in raw_phones]
+def chunk_list(lst, size):
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
 
-    return {
-        "url": url,
-        "emails": emails,
-        "phones": phones
-    }
+# --- Main Runner ---
+profiles = fetch_pending_profiles()
+if not profiles:
+    print(" No unprocessed profiles found.")
+    exit()
 
+chunks = list(chunk_list(profiles, 3))
+for idx, chunk in enumerate(chunks):
+    if idx >= len(chrome_profiles):
+        print("No more Chrome profiles available.")
+        break
 
-# List of LinkedIn profiles
-linkedin_profiles = [
-    "https://www.linkedin.com/in/shaphan-samuel-16257819/",
-]
+    profile = chrome_profiles[idx]
+    urls = [row[1] for row in chunk]
+    ids = [row[0] for row in chunk]
+    print(f"\nLaunching profile {profile} on URLs: {urls}")
 
-# Launch Chrome with all profiles as tabs
-print(" Opening all profiles in tabs...")
-subprocess.Popen([
-    'start', 'chrome',
-    '--remote-debugging-port=9222',
-    '--user-data-dir=C:\\Users\\SHABAN\\AppData\\Local\\Google\\Chrome\\User Data',
-    '--profile-directory=Profile 1',
-    *linkedin_profiles
-], shell=True)
+    subprocess.Popen([
+        'start', 'chrome',
+        '--remote-debugging-port=9222',
+        f'--user-data-dir={CHROME_USER_DIR}',
+        f'--profile-directory={profile}',
+        *urls
+    ], shell=True)
+    time.sleep(10)
 
-time.sleep(7)
+    total_emails = total_phones = 0
+    for i2, (person_id, url) in enumerate(chunk):
+        print(f" [Tab {i2+1}] {url}")
+        emails, phones, raw_clip = extract_from_current_tab(url)
+        print(f" Extracted {len(emails)} emails, {len(phones)} phones")
 
+        # Original insertion logic
+        for e in emails:
+            insert_email(e, person_id)
+        for p in phones:
+            insert_phone(p, person_id)
 
-results = []
+        # Count email/phone found
+        total_emails += len(emails)
+        total_phones += len(phones)
 
-# Loop through tabs
-for index, url in enumerate(linkedin_profiles):
-    print(f"\n Tab {index + 1}: {url}")
-    result = extract_from_current_tab(url)
-    results.append(result)
+        if i2 < len(chunk) - 1:
+            pyautogui.hotkey("ctrl", "tab")
+            time.sleep(3)
 
-    # Switch to next tab (except after last one)
-    if index < len(linkedin_profiles) - 1:
-        pyautogui.hotkey("ctrl", "tab")
-        time.sleep(3)
+    mark_done(ids)
+    update_credits(profile, total_emails, total_phones)
+    os.system("taskkill /F /IM chrome.exe")
+    time.sleep(5)
 
-# Choose your webhook URL
-USE_TEST_URL = True  # Set to False for production
-WEBHOOK_URL = "http://localhost:5678/webhook-test/from-pyautogui" if USE_TEST_URL else "http://localhost:5678/webhook/from-pyautogui"
-
-# Final output
-print("\n Final Extracted JSON:")
-print(json.dumps(results, indent=4))
-
-# Send to n8n
-try:
-    response = requests.post(WEBHOOK_URL, json={"data": results})
-
-    if response.status_code == 200:
-        print(f" Successfully sent to n8n: {response.status_code}")
-    else:
-        print(f" Sent request but got unexpected status code: {response.status_code}")
-        print("Response text:", response.text)
-except Exception as e:
-    print(f" Failed to send data to n8n: {e}")
+cur.close()
+conn.close()
+print("magic has been done.")
