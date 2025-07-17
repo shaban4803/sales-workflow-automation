@@ -1,63 +1,190 @@
+from datetime import datetime, timezone
 import pyautogui
-pyautogui.FAILSAFE = False
 import subprocess
 import time
+import pyperclip
+import json
+import re
+import os
+import psycopg2
+import uuid
 
-def wait_until_found_and_click(image_name, confidence=0.8):
-    print(f" Waiting until '{image_name}' is found...")
+pyautogui.FAILSAFE = False
+
+# Path to image folder
+IMAGE_DIR = r"C:\Users\Administrator\Downloads\n8n"
+
+# PostgreSQL connection
+print(" Connecting to postgres")
+conn = psycopg2.connect(
+    host="192.168.99.72",
+    port=5432,
+    database="BusinessDevelopmentWarehouse",
+    user="postgres",
+    password="axiom@0900"
+)
+conn.autocommit = True
+cur = conn.cursor()
+print("postgres connection successful.")
+
+CHROME_USER_DIR = r'C:\Users\Administrator\AppData\Local\Google\Chrome\User Data'
+chrome_profiles = ["Profile 2", "Profile 2", "Profile 2"]
+
+def fetch_pending_profiles(limit=9):
+    print(f" Fetching up to {limit} unprocessed profiles from Staging.People...")
+    cur.execute('SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL LIMIT %s', (limit,))
+    rows = cur.fetchall()
+    print(f" Fetched {len(rows)} profiles.")
+    return rows
+
+def insert_email(email, people_id):
+    cur.execute(
+        'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
+        (str(people_id),)
+    )
+    result = cur.fetchone()
+    if not result:
+        print(f"No company found for PeopleId: {people_id}")
+        return
+    company_id = result[0]
+    cur.execute(
+        '''
+        INSERT INTO "Staging"."Email"
+        ("Email", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
+        VALUES (%s, %s, %s, now(), now())
+        ''',
+        (email, str(people_id), str(company_id))
+    )
+    conn.commit()
+    print(f"Inserted email for PeopleId: {people_id}")
+
+def insert_phone(contact_no, people_id):
+    cur.execute(
+        'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
+        (str(people_id),)
+    )
+    result = cur.fetchone()
+    if not result:
+        print(f"No company found for PeopleId: {people_id}")
+        return
+    company_id = result[0]
+    cur.execute(
+        '''
+        INSERT INTO "Staging"."Contact"
+        ("ContactNumber", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
+        VALUES (%s, %s, %s, now(), now())
+        ''',
+        (contact_no, str(people_id), str(company_id))
+    )
+    conn.commit()
+    print(f"Phone inserted for PeopleId: {people_id}")
+
+def mark_done(ids):
+    print(f" Marking people as processed: {ids}")
+    cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s', (tuple(ids),))
+
+def wait_until_found_and_click(image, confidence=0.6):
+    full_image_path = os.path.join(IMAGE_DIR, image)
+    print(f" Waiting for image: {full_image_path}")
     while True:
         try:
-            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
+            location = pyautogui.locateOnScreen(full_image_path, confidence=confidence)
             if location:
+                print(f" Found and clicking: {image}")
                 pyautogui.moveTo(pyautogui.center(location), duration=0.5)
                 pyautogui.click()
-                print(f" Clicked: {image_name}")
                 return
         except Exception as e:
-            print(f" Error locating {image_name}: {e}")
+            print(f" Error locating {image}: {e}")
         time.sleep(1)
 
-def try_click_with_timeout(image_name, timeout=16, confidence=0.8):
-    print(f" Trying to find '{image_name}' for up to {timeout} seconds...")
-    start_time = time.time()
-    while (time.time() - start_time) < timeout:
+def try_click_with_timeout(image, timeout=9, confidence=0.6):
+    full_image_path = os.path.join(IMAGE_DIR, image)
+    print(f" Trying to click {full_image_path} for {timeout}s...")
+    start = time.time()
+    while time.time() - start < timeout:
         try:
-            location = pyautogui.locateOnScreen(image_name, confidence=confidence)
+            location = pyautogui.locateOnScreen(full_image_path, confidence=confidence)
             if location:
+                print(f" Clicked: {image}")
                 pyautogui.moveTo(pyautogui.center(location), duration=0.5)
                 pyautogui.click()
-                print(f" Clicked: {image_name}")
                 return True
         except Exception as e:
-            print(f" Error locating {image_name}: {e}")
+            print(f" Error: {e}")
         time.sleep(1)
-    print(f"⏱ '{image_name}' not found within {timeout}s.")
+    print(f" Timeout: {image} not found.")
     return False
 
-# Step 1: Launch Chrome with LinkedIn profile using correct profile directory
-print(" Launching Chrome with LinkedIn Profile...")
-subprocess.Popen([
-    'start', 'chrome',
-    '--remote-debugging-port=9222',
-    '--user-data-dir=C:\\Users\\SHABAN\\AppData\\Local\\Google\\Chrome\\User Data',
-    '--profile-directory=Profile 1',
-    'https://www.linkedin.com/in/anupammittal007/'
-], shell=True)
-
-# Step 2: Wait a few seconds to allow page to load
-time.sleep(5)
-
-# Step 3: Wait for and click the Apollo button
-wait_until_found_and_click('apollo_button.png')
-
-# Step 4: Wait for Apollo sidebar to finish loading
-time.sleep(16)
-
-# Step 5: Try clicking email and phone buttons
-email_clicked = try_click_with_timeout('apollo_button_email.png', timeout=16)
-if email_clicked:
+def extract_from_current_tab(url):
+    print(f"Scraping: {url}")
+    wait_until_found_and_click('apollo_button.png')
     time.sleep(9)
 
-phone_clicked = try_click_with_timeout('apollo_button_phone.png', timeout=16)
-if phone_clicked:
-    time.sleep(9)
+    try_click_with_timeout('apollo_button_email.png', timeout=9)
+    try_click_with_timeout('apollo_button_phone.png', timeout=9)
+    time.sleep(6)
+    pyperclip.copy("")  # Clear clipboard
+    pyautogui.click(1258, 319)  # click Apollo sidebar
+    time.sleep(1)
+    pyautogui.hotkey("ctrl", "a")
+    time.sleep(1)
+    pyautogui.hotkey("ctrl", "c")
+    time.sleep(2)
+
+    content = pyperclip.paste()
+    if not content.strip():
+        print(" Clipboard empty.")
+        return [], []
+
+    emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
+    phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", content)]
+    return emails, phones
+
+def chunk_list(lst, size):
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
+
+# --- Main ---
+profiles = fetch_pending_profiles()
+if not profiles:
+    print(" No unprocessed profiles found.")
+    exit()
+
+for i, chunk in enumerate(chunk_list(profiles, 3)):
+    chrome_profile = chrome_profiles[i % len(chrome_profiles)]
+    urls = [row[1] for row in chunk]
+    ids = [row[0] for row in chunk]
+
+    print(f"\n Launching Chrome profile: {chrome_profile} for URLs: {urls}")
+    subprocess.Popen([
+        'start', 'chrome',
+        '--remote-debugging-port=9222',
+        f'--user-data-dir={CHROME_USER_DIR}',
+        f'--profile-directory={chrome_profile}',
+        *urls
+    ], shell=True)
+
+    time.sleep(10)
+
+    for idx, (person_id, url) in enumerate(chunk):
+        print(f"\n [Tab {idx+1}] {url}")
+        emails, phones = extract_from_current_tab(url)
+
+        print(f" Extracted {len(emails)} emails, {len(phones)} phones")
+        for email in emails:
+            insert_email(email, person_id)
+        for phone in phones:
+            insert_phone(phone, person_id)
+
+        if idx < len(chunk) - 1:
+            pyautogui.hotkey("ctrl", "tab")
+            time.sleep(3)
+
+    mark_done(ids)
+    os.system("taskkill /F /IM chrome.exe")
+    time.sleep(5)
+
+cur.close()
+conn.close()
+print("magic has been done.")
