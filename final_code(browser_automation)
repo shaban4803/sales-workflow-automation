@@ -25,109 +25,117 @@ cur = conn.cursor()
 print("postgres connection successful.")
 
 CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
-chrome_profiles = ["Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Profile 6", "Profile 7",
-                   "Profile 8", "Profile 9", "Profile 10"]
-
+chrome_profiles = ["Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Profile 6", "Profile 7", "Profile 8", "Profile 9", "Profile 10"]
 
 # index tracking functions
 def get_last_index():
-    cur.execute('SELECT "index" FROM "Raw"."IndexCount" ORDER BY "index" DESC LIMIT 1')
-    result = cur.fetchone()
-    return result[0] if result else 0
-
+    try:
+        cur.execute('SELECT "index" FROM "Raw"."IndexCount" ORDER BY "index" DESC LIMIT 1')
+        result = cur.fetchone()
+        return result[0] if result else 0
+    except Exception as e:
+        print(f"Error getting last index: {e}")
+        return 0
 
 def save_current_index(index):
-    cur.execute('INSERT INTO "Raw"."IndexCount" ("index") VALUES (%s)', (index,))
-    conn.commit()
-
+    try:
+        cur.execute('INSERT INTO "Raw"."IndexCount" ("index") VALUES (%s)', (index,))
+        conn.commit()
+        print(f"Saved index: {index}")
+    except Exception as e:
+        print(f"Error saving index {index}: {e}")
 
 # insertion logic etc.
 def fetch_pending_profiles(limit=30):
     start_index = get_last_index()
     print(f" Starting from index: {start_index}")
     print(f" Fetching up to {limit} unprocessed profiles from Staging.People...")
-    cur.execute(
-        'SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL OFFSET %s LIMIT %s',
-        (start_index, limit))
+    cur.execute('SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL OFFSET %s LIMIT %s', (start_index, limit))
     rows = cur.fetchall()
     print(f" Fetched {len(rows)} profiles.")
     return rows
 
-
 def insert_email(email, people_id):
-    # 1. Get company_id from People table
-    cur.execute(
-        'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
-        (str(people_id),)
-    )
-    result = cur.fetchone()
+    try:
+        # Validate email format
+        if not email or not re.match(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", email):
+            print(f"Invalid email format: {email}")
+            return
+            
+        # 1. Get company_id from People table
+        cur.execute(
+            'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
+            (str(people_id),)
+        )
+        result = cur.fetchone()
 
-    if not result:
-        print(f"No company found for PeopleId: {people_id}")
-        return
+        if not result:
+            print(f"No record found for PeopleId: {people_id}")
+            return
 
-    company_id = result[0]
+        company_id = result[0]
+        
+        # Handle None company_id
+        company_id_param = None if company_id is None else str(company_id)
 
-    # Handle None company_id
-    if company_id is None:
-        print(f"CompanyId is None for PeopleId: {people_id}, inserting with NULL")
-        company_id_param = None
-    else:
-        company_id_param = str(company_id)
-
-    # 2. Insert email (omit Id — let it auto-increment)
-    cur.execute(
-        '''
-        INSERT INTO "Staging"."Email"
-        ("Email", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
-        VALUES (%s, %s, %s, now(), now())
-        ''',
-        (email, str(people_id), company_id_param)
-    )
-    conn.commit()
-    print("Email inserted successfully")
-
-    print(f"Inserted email for PeopleId: {people_id}")
-
+        # 2. Insert email
+        cur.execute(
+            '''
+            INSERT INTO "Staging"."Email"
+            ("Email", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
+            VALUES (%s, %s, %s, now(), now())
+            ''',
+            (email, str(people_id), company_id_param)
+        )
+        conn.commit()
+        print(f"Inserted email {email} for PeopleId: {people_id}")
+        
+    except Exception as e:
+        print(f"Error inserting email {email} for PeopleId {people_id}: {e}")
+        conn.rollback()
 
 def insert_phone(contact_no, people_id):
-    # 1. Get CompanyId using PeopleId
-    cur.execute(
-        'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
-        (str(people_id),)
-    )
-    result = cur.fetchone()
+    try:
+        # Validate phone format
+        if not contact_no or not re.match(r"\+\d[\d\s\-()]{7,}", contact_no.strip()):
+            print(f"Invalid phone format: {contact_no}")
+            return
+            
+        # 1. Get CompanyId using PeopleId
+        cur.execute(
+            'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
+            (str(people_id),)
+        )
+        result = cur.fetchone()
 
-    if not result:
-        print(f"No company found for PeopleId: {people_id}")
-        return
+        if not result:
+            print(f"No record found for PeopleId: {people_id}")
+            return
 
-    company_id = result[0]
+        company_id = result[0]
+        
+        # Handle None company_id
+        company_id_param = None if company_id is None else str(company_id)
 
-    # Handle None company_id
-    if company_id is None:
-        print(f"CompanyId is None for PeopleId: {people_id}, inserting with NULL")
-        company_id_param = None
-    else:
-        company_id_param = str(company_id)
-
-    # 2. Insert into Staging.Contact
-    cur.execute(
-        '''
-        INSERT INTO "Staging"."Contact"
-        ("ContactNumber", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
-        VALUES (%s, %s, %s, now(), now())
-        ''',
-        (contact_no, str(people_id), company_id_param)
-    )
-    conn.commit()
-    print(f"Phone inserted for PeopleId: {people_id}")
-
+        # 2. Insert into Staging.Contact
+        cur.execute(
+            '''
+            INSERT INTO "Staging"."Contact"
+            ("ContactNumber", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
+            VALUES (%s, %s, %s, now(), now())
+            ''',
+            (contact_no.strip(), str(people_id), company_id_param)
+        )
+        conn.commit()
+        print(f"Inserted phone {contact_no} for PeopleId: {people_id}")
+        
+    except Exception as e:
+        print(f"Error inserting phone {contact_no} for PeopleId {people_id}: {e}")
+        conn.rollback()
 
 def mark_done(ids):
     print(f" Marking people as processed: {ids}")
     cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s', (tuple(ids),))
-
 
 # implementing pyautogui.
 def wait_until_found_and_click(image, confidence=0.6):
@@ -143,7 +151,6 @@ def wait_until_found_and_click(image, confidence=0.6):
         except Exception as e:
             print(f" Error locating {image}: {e}")
         time.sleep(1)
-
 
 def try_click_with_timeout(image, timeout=9, confidence=0.6):
     print(f" Trying to click {image} for {timeout}s...")
@@ -162,84 +169,141 @@ def try_click_with_timeout(image, timeout=9, confidence=0.6):
     print(f" Timeout: {image} not found.")
     return False
 
-
 def extract_from_current_tab(url):
-    print(f"Scraping: {url}")
-    wait_until_found_and_click('apollo_button.png')
-    time.sleep(9)
+    try:
+        print(f"Scraping: {url}")
+        
+        # Try to find Apollo button with timeout
+        if not try_click_with_timeout('apollo_button.png', timeout=15):
+            print(f"Apollo button not found for {url}, skipping...")
+            return [], []
+            
+        time.sleep(9)
 
-    try_click_with_timeout('apollo_button_email.png', timeout=9)
-    try_click_with_timeout('apollo_button_phone.png', timeout=9)
-    time.sleep(6)
-    pyperclip.copy("")  # Clear clipboard
-    pyautogui.click(1258, 319)  # click Apollo sidebar
-    time.sleep(1)
-    pyautogui.hotkey("ctrl", "a")
-    time.sleep(1)
-    pyautogui.hotkey("ctrl", "c")
-    time.sleep(2)
+        try_click_with_timeout('apollo_button_email.png', timeout=9)
+        try_click_with_timeout('apollo_button_phone.png', timeout=9)
+        time.sleep(6)
+        
+        pyperclip.copy("")  # Clear clipboard
+        pyautogui.click(1258, 319)  # click Apollo sidebar
+        time.sleep(1)
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(1)
+        pyautogui.hotkey("ctrl", "c")
+        time.sleep(2)
 
-    content = pyperclip.paste()
-    if not content.strip():
-        print(" Clipboard empty.")
+        content = pyperclip.paste()
+        if not content or not content.strip():
+            print(" Clipboard empty or no content found.")
+            return [], []
+
+        emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
+        phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", content) if p.strip()]
+        
+        # Remove duplicates
+        emails = list(set(emails))
+        phones = list(set(phones))
+        
+        return emails, phones
+        
+    except Exception as e:
+        print(f"Error extracting from {url}: {e}")
         return [], []
-
-    emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
-    phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", content)]
-    return emails, phones
-
 
 def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
-
 # --- Main ---
-start_offset = get_last_index()
-profiles = fetch_pending_profiles()
-if not profiles:
-    print(" No unprocessed profiles found.")
-    exit()
+try:
+    start_offset = get_last_index()
+    profiles = fetch_pending_profiles()
+    if not profiles:
+        print(" No unprocessed profiles found.")
+        exit()
 
-for i, chunk in enumerate(chunk_list(profiles, 3)):
-    current_batch_start = start_offset + (i * 3)
-    chrome_profile = chrome_profiles[i % len(chrome_profiles)]
-    urls = [row[1] for row in chunk]
-    ids = [row[0] for row in chunk]
+    for i, chunk in enumerate(chunk_list(profiles, 3)):
+        try:
+            current_batch_start = start_offset + (i * 3)
+            chrome_profile = chrome_profiles[i % len(chrome_profiles)]
+            urls = [row[1] for row in chunk if row[1]]  # Filter out None URLs
+            ids = [row[0] for row in chunk]
 
-    print(f"\n Launching Chrome profile: {chrome_profile} for URLs: {urls}")
-    subprocess.Popen([
-        'start', 'chrome',
-        '--remote-debugging-port=9222',
-        f'--user-data-dir={CHROME_USER_DIR}',
-        f'--profile-directory={chrome_profile}',
-        *urls
-    ], shell=True)
+            if not urls:
+                print(f"No valid URLs in batch {i+1}, skipping...")
+                continue
 
-    time.sleep(10)
+            print(f"\n Launching Chrome profile: {chrome_profile} for URLs: {urls}")
+            subprocess.Popen([
+                'start', 'chrome',
+                '--remote-debugging-port=9222',
+                f'--user-data-dir={CHROME_USER_DIR}',
+                f'--profile-directory={chrome_profile}',
+                *urls
+            ], shell=True)
 
-    for idx, (person_id, url) in enumerate(chunk):
-        current_profile_index = current_batch_start + idx + 1
-        print(f"\n [Tab {idx + 1}] Profile {current_profile_index}: {url}")
-        emails, phones = extract_from_current_tab(url)
+            time.sleep(10)
 
-        print(f" Extracted {len(emails)} emails, {len(phones)} phones")
-        for email in emails:
-            insert_email(email, person_id)
-        for phone in phones:
-            insert_phone(phone, person_id)
+            for idx, (person_id, url) in enumerate(chunk):
+                try:
+                    if not url:
+                        print(f"Skipping profile {person_id} - no URL")
+                        continue
+                        
+                    current_profile_index = current_batch_start + idx + 1
+                    print(f"\n [Tab {idx+1}] Profile {current_profile_index}: {url}")
+                    
+                    emails, phones = extract_from_current_tab(url)
 
-        # Save progress after each profile
-        save_current_index(current_profile_index)
+                    print(f" Extracted {len(emails)} emails, {len(phones)} phones")
+                    
+                    # Insert emails with error handling
+                    for email in emails:
+                        insert_email(email, person_id)
+                    
+                    # Insert phones with error handling  
+                    for phone in phones:
+                        insert_phone(phone, person_id)
 
-        if idx < len(chunk) - 1:
-            pyautogui.hotkey("ctrl", "tab")
-            time.sleep(3)
+                    # Save progress after each profile
+                    save_current_index(current_profile_index)
 
-    mark_done(ids)
-    os.system("taskkill /F /IM chrome.exe")
-    time.sleep(5)
+                    if idx < len(chunk) - 1:
+                        pyautogui.hotkey("ctrl", "tab")
+                        time.sleep(3)
+                        
+                except Exception as e:
+                    print(f"Error processing profile {person_id}: {e}")
+                    # Continue with next profile instead of crashing
+                    continue
 
-cur.close()
-conn.close()
-print("magic has been done.")
+            mark_done(ids)
+            
+            # Kill Chrome safely
+            try:
+                os.system("taskkill /F /IM chrome.exe")
+                time.sleep(5)
+            except Exception as e:
+                print(f"Error killing Chrome: {e}")
+                
+        except Exception as e:
+            print(f"Error processing batch {i+1}: {e}")
+            # Kill Chrome and continue with next batch
+            try:
+                os.system("taskkill /F /IM chrome.exe")
+                time.sleep(5)
+            except:
+                pass
+            continue
+
+except Exception as e:
+    print(f"Critical error in main execution: {e}")
+finally:
+    # Always close database connections
+    try:
+        cur.close()
+        conn.close()
+        print("Database connections closed.")
+    except:
+        pass
+    print("Script execution completed.")
