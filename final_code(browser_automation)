@@ -11,8 +11,8 @@ import uuid
 
 pyautogui.FAILSAFE = False
 
-# this part connects to database.
-print(" Connecting to postgres")
+# Database connection
+print("Connecting to postgres...")
 conn = psycopg2.connect(
     host="192.168.99.72",
     port=5432,
@@ -22,12 +22,14 @@ conn = psycopg2.connect(
 )
 conn.autocommit = True
 cur = conn.cursor()
-print("postgres connection successful.")
+print("Postgres connection successful.")
 
 CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
-chrome_profiles = ["Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Profile 6", "Profile 7", "Profile 8", "Profile 9", "Profile 10"]
+chrome_profiles = ["Profile 5", "Profile 5", "Profile 5", "Profile 5", "Profile 5", "Profile 5", "Profile 7",
+                   "Profile 8", "Profile 9", "Profile 10"]
 
-# index tracking functions
+
+# Index tracking functions
 def get_last_index():
     try:
         cur.execute('SELECT "index" FROM "Raw"."IndexCount" ORDER BY "index" DESC LIMIT 1')
@@ -37,35 +39,39 @@ def get_last_index():
         print(f"Error getting last index: {e}")
         return 0
 
+
 def save_current_index(index):
     try:
         cur.execute('INSERT INTO "Raw"."IndexCount" ("index") VALUES (%s)', (index,))
-        conn.commit()
         print(f"Saved index: {index}")
     except Exception as e:
         print(f"Error saving index {index}: {e}")
 
-# insertion logic etc.
-def fetch_pending_profiles(limit=30):
-    start_index = get_last_index()
-    print(f" Starting from index: {start_index}")
-    print(f" Fetching up to {limit} unprocessed profiles from Staging.People...")
-    cur.execute('SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL OFFSET %s LIMIT %s', (start_index, limit))
-    rows = cur.fetchall()
-    print(f" Fetched {len(rows)} profiles.")
-    return rows
 
+# Fixed insertion logic
 def insert_email(email, people_id):
     try:
         # Validate email format
         if not email or not re.match(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", email):
             print(f"Invalid email format: {email}")
             return
-            
-        # 1. Get company_id from People table
+
+        # Ensure people_id is integer
+        people_id = int(people_id)
+
+        # Check if email already exists for this person to avoid duplicates
+        cur.execute(
+            'SELECT COUNT(*) FROM "Staging"."Email" WHERE "Email" = %s AND "PeopleId" = %s',
+            (email, people_id)
+        )
+        if cur.fetchone()[0] > 0:
+            print(f"Email {email} already exists for PeopleId: {people_id}")
+            return
+
+        # Get company_id from People table
         cur.execute(
             'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
-            (str(people_id),)
+            (people_id,)
         )
         result = cur.fetchone()
 
@@ -73,38 +79,54 @@ def insert_email(email, people_id):
             print(f"No record found for PeopleId: {people_id}")
             return
 
-        company_id = result[0]
-        
-        # Handle None company_id
-        company_id_param = None if company_id is None else str(company_id)
+        company_id = result[0]  # This can be None/NULL, which is fine
 
-        # 2. Insert email
+        # Insert email with UUID generation
         cur.execute(
             '''
             INSERT INTO "Staging"."Email"
-            ("Email", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
-            VALUES (%s, %s, %s, now(), now())
+            ("Email", "PeopleId", "CompanyId", "UUID", "CreatedAt", "UpdatedAt")
+            VALUES (%s, %s, %s, uuid_generate_v4(), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''',
-            (email, str(people_id), company_id_param)
+            (email, people_id, company_id)
         )
-        conn.commit()
-        print(f"Inserted email {email} for PeopleId: {people_id}")
-        
+        print(f"Inserted email {email} for PeopleId: {people_id}, CompanyId: {company_id}")
+
+    except psycopg2.IntegrityError as e:
+        print(f"Integrity error inserting email {email} for PeopleId {people_id}: {e}")
+        conn.rollback()
+    except ValueError as e:
+        print(f"Invalid PeopleId format {people_id}: {e}")
     except Exception as e:
         print(f"Error inserting email {email} for PeopleId {people_id}: {e}")
         conn.rollback()
 
+
 def insert_phone(contact_no, people_id):
     try:
-        # Validate phone format
-        if not contact_no or not re.match(r"\+\d[\d\s\-()]{7,}", contact_no.strip()):
+        # Validate phone format - more flexible validation
+        if not contact_no or len(contact_no.strip()) < 7:
             print(f"Invalid phone format: {contact_no}")
             return
-            
-        # 1. Get CompanyId using PeopleId
+
+        contact_no = contact_no.strip()
+
+        # Ensure people_id is integer
+        people_id = int(people_id)
+
+        # Check if phone already exists for this person to avoid duplicates
+        cur.execute(
+            'SELECT COUNT(*) FROM "Staging"."Contact" WHERE "ContactNumber" = %s AND "PeopleId" = %s',
+            (contact_no, people_id)
+        )
+        if cur.fetchone()[0] > 0:
+            print(f"Phone {contact_no} already exists for PeopleId: {people_id}")
+            return
+
+        # Get CompanyId using PeopleId
         cur.execute(
             'SELECT "CompanyId" FROM "Staging"."People" WHERE "Id" = %s',
-            (str(people_id),)
+            (people_id,)
         )
         result = cur.fetchone()
 
@@ -112,78 +134,110 @@ def insert_phone(contact_no, people_id):
             print(f"No record found for PeopleId: {people_id}")
             return
 
-        company_id = result[0]
-        
-        # Handle None company_id
-        company_id_param = None if company_id is None else str(company_id)
+        company_id = result[0]  # This can be None/NULL, which is fine
 
-        # 2. Insert into Staging.Contact
+        # Insert into Staging.Contact with UUID generation
         cur.execute(
             '''
             INSERT INTO "Staging"."Contact"
-            ("ContactNumber", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
-            VALUES (%s, %s, %s, now(), now())
+            ("ContactNumber", "PeopleId", "CompanyId", "UUID", "CreatedAt", "UpdatedAt")
+            VALUES (%s, %s, %s, uuid_generate_v4(), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ''',
-            (contact_no.strip(), str(people_id), company_id_param)
+            (contact_no, people_id, company_id)
         )
-        conn.commit()
-        print(f"Inserted phone {contact_no} for PeopleId: {people_id}")
-        
+        print(f"Inserted phone {contact_no} for PeopleId: {people_id}, CompanyId: {company_id}")
+
+    except psycopg2.IntegrityError as e:
+        print(f"Integrity error inserting phone {contact_no} for PeopleId {people_id}: {e}")
+        conn.rollback()
+    except ValueError as e:
+        print(f"Invalid PeopleId format {people_id}: {e}")
     except Exception as e:
         print(f"Error inserting phone {contact_no} for PeopleId {people_id}: {e}")
         conn.rollback()
 
-def mark_done(ids):
-    print(f" Marking people as processed: {ids}")
-    cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s', (tuple(ids),))
 
-# implementing pyautogui.
+def fetch_pending_profiles(limit=30):
+    start_index = get_last_index()
+    print(f"Starting from index: {start_index}")
+    print(f"Fetching up to {limit} unprocessed profiles from Staging.People...")
+    cur.execute(
+        'SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL OFFSET %s LIMIT %s',
+        (start_index, limit))
+    rows = cur.fetchall()
+    print(f"Fetched {len(rows)} profiles.")
+    return rows
+
+
+def mark_done(ids):
+    try:
+        if not ids:
+            return
+
+        print(f"Marking people as processed: {ids}")
+
+        # Use proper tuple formatting for IN clause
+        if len(ids) == 1:
+            cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" = %s', (ids[0],))
+        else:
+            cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" = ANY(%s)', (ids,))
+
+        print(f"Marked {cur.rowcount} records as processed")
+
+    except Exception as e:
+        print(f"Error marking records as done: {e}")
+        conn.rollback()
+
+
+# PyAutoGUI functions
 def wait_until_found_and_click(image, confidence=0.6):
-    print(f" Waiting for image: {image}")
+    print(f"Waiting for image: {image}")
     while True:
         try:
             location = pyautogui.locateOnScreen(image, confidence=confidence)
             if location:
-                print(f" Found and clicking: {image}")
+                print(f"Found and clicking: {image}")
                 pyautogui.moveTo(pyautogui.center(location), duration=0.5)
                 pyautogui.click()
                 return
         except Exception as e:
-            print(f" Error locating {image}: {e}")
+            print(f"Error locating {image}: {e}")
         time.sleep(1)
 
+
 def try_click_with_timeout(image, timeout=9, confidence=0.6):
-    print(f" Trying to click {image} for {timeout}s...")
+    print(f"Trying to click {image} for {timeout}s...")
     start = time.time()
     while time.time() - start < timeout:
         try:
             location = pyautogui.locateOnScreen(image, confidence=confidence)
             if location:
-                print(f" Clicked: {image}")
+                print(f"Clicked: {image}")
                 pyautogui.moveTo(pyautogui.center(location), duration=0.5)
                 pyautogui.click()
                 return True
         except Exception as e:
-            print(f" Error: {e}")
+            print(f"Error: {e}")
         time.sleep(1)
-    print(f" Timeout: {image} not found.")
+    print(f"Timeout: {image} not found.")
     return False
+
 
 def extract_from_current_tab(url):
     try:
         print(f"Scraping: {url}")
-        
+
         # Try to find Apollo button with timeout
-        if not try_click_with_timeout('apollo_button.png', timeout=15):
+        if not try_click_with_timeout('apollo_button.png', timeout=30):
             print(f"Apollo button not found for {url}, skipping...")
             return [], []
-            
+
         time.sleep(9)
 
         try_click_with_timeout('apollo_button_email.png', timeout=9)
         try_click_with_timeout('apollo_button_phone.png', timeout=9)
         time.sleep(6)
-        
+
         pyperclip.copy("")  # Clear clipboard
         pyautogui.click(1258, 319)  # click Apollo sidebar
         time.sleep(1)
@@ -194,32 +248,36 @@ def extract_from_current_tab(url):
 
         content = pyperclip.paste()
         if not content or not content.strip():
-            print(" Clipboard empty or no content found.")
+            print("Clipboard empty or no content found.")
             return [], []
 
         emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", content)
         phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", content) if p.strip()]
-        
+
         # Remove duplicates
         emails = list(set(emails))
         phones = list(set(phones))
-        
+
         return emails, phones
-        
+
     except Exception as e:
         print(f"Error extracting from {url}: {e}")
         return [], []
+
 
 def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
-# --- Main ---
+
+# --- MAIN EXECUTION ---
 try:
+    print("Starting LinkedIn Contact Scraper...")
     start_offset = get_last_index()
     profiles = fetch_pending_profiles()
+
     if not profiles:
-        print(" No unprocessed profiles found.")
+        print("No unprocessed profiles found. Script completed!")
         exit()
 
     for i, chunk in enumerate(chunk_list(profiles, 3)):
@@ -230,10 +288,12 @@ try:
             ids = [row[0] for row in chunk]
 
             if not urls:
-                print(f"No valid URLs in batch {i+1}, skipping...")
+                print(f"No valid URLs in batch {i + 1}, skipping...")
                 continue
 
-            print(f"\n Launching Chrome profile: {chrome_profile} for URLs: {urls}")
+            print(f"\nBatch {i + 1}: Launching Chrome profile: {chrome_profile}")
+            print(f"URLs: {urls}")
+
             subprocess.Popen([
                 'start', 'chrome',
                 '--remote-debugging-port=9222',
@@ -249,45 +309,51 @@ try:
                     if not url:
                         print(f"Skipping profile {person_id} - no URL")
                         continue
-                        
+
                     current_profile_index = current_batch_start + idx + 1
-                    print(f"\n [Tab {idx+1}] Profile {current_profile_index}: {url}")
-                    
+                    print(f"\n[Tab {idx + 1}] Profile {current_profile_index}: Processing PeopleId {person_id}")
+                    print(f"🔗 URL: {url}")
+
                     emails, phones = extract_from_current_tab(url)
 
-                    print(f" Extracted {len(emails)} emails, {len(phones)} phones")
-                    
+                    print(f"Extracted {len(emails)} emails, {len(phones)} phones")
+
                     # Insert emails with error handling
                     for email in emails:
                         insert_email(email, person_id)
-                    
-                    # Insert phones with error handling  
+
+                    # Insert phones with error handling
                     for phone in phones:
                         insert_phone(phone, person_id)
 
                     # Save progress after each profile
                     save_current_index(current_profile_index)
+                    print(f"Progress saved at index: {current_profile_index}")
 
                     if idx < len(chunk) - 1:
+                        print("Switching to next tab...")
                         pyautogui.hotkey("ctrl", "tab")
                         time.sleep(3)
-                        
+
                 except Exception as e:
                     print(f"Error processing profile {person_id}: {e}")
                     # Continue with next profile instead of crashing
                     continue
 
+            # Mark batch as completed
             mark_done(ids)
-            
+            print(f"Batch {i + 1} completed successfully!")
+
             # Kill Chrome safely
             try:
+                print("Closing Chrome...")
                 os.system("taskkill /F /IM chrome.exe")
                 time.sleep(5)
             except Exception as e:
                 print(f"Error killing Chrome: {e}")
-                
+
         except Exception as e:
-            print(f"Error processing batch {i+1}: {e}")
+            print(f"Error processing batch {i + 1}: {e}")
             # Kill Chrome and continue with next batch
             try:
                 os.system("taskkill /F /IM chrome.exe")
@@ -295,6 +361,8 @@ try:
             except:
                 pass
             continue
+
+    print("All batches completed successfully!")
 
 except Exception as e:
     print(f"Critical error in main execution: {e}")
