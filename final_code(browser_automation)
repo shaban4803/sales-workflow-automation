@@ -25,15 +25,34 @@ cur = conn.cursor()
 print("postgres connection successful.")
 
 CHROME_USER_DIR = r'C:\Users\SHABAN\AppData\Local\Google\Chrome\User Data'
-chrome_profiles = ["Profile 1", "Profile 1", "Profile 1"]
+chrome_profiles = ["Profile 1", "Profile 2", "Profile 3", "Profile 4", "Profile 5", "Profile 6", "Profile 7",
+                   "Profile 8", "Profile 9", "Profile 10"]
+
+
+# index tracking functions
+def get_last_index():
+    cur.execute('SELECT "index" FROM "Raw"."IndexCount" ORDER BY "index" DESC LIMIT 1')
+    result = cur.fetchone()
+    return result[0] if result else 0
+
+
+def save_current_index(index):
+    cur.execute('INSERT INTO "Raw"."IndexCount" ("index") VALUES (%s)', (index,))
+    conn.commit()
+
 
 # insertion logic etc.
-def fetch_pending_profiles(limit=9):
+def fetch_pending_profiles(limit=30):
+    start_index = get_last_index()
+    print(f" Starting from index: {start_index}")
     print(f" Fetching up to {limit} unprocessed profiles from Staging.People...")
-    cur.execute('SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL LIMIT %s', (limit,))
+    cur.execute(
+        'SELECT "Id", "LinkedIn" FROM "Staging"."People" WHERE "Status" = FALSE AND "LinkedIn" IS NOT NULL OFFSET %s LIMIT %s',
+        (start_index, limit))
     rows = cur.fetchall()
     print(f" Fetched {len(rows)} profiles.")
     return rows
+
 
 def insert_email(email, people_id):
     # 1. Get company_id from People table
@@ -49,6 +68,13 @@ def insert_email(email, people_id):
 
     company_id = result[0]
 
+    # Handle None company_id
+    if company_id is None:
+        print(f"CompanyId is None for PeopleId: {people_id}, inserting with NULL")
+        company_id_param = None
+    else:
+        company_id_param = str(company_id)
+
     # 2. Insert email (omit Id — let it auto-increment)
     cur.execute(
         '''
@@ -56,12 +82,13 @@ def insert_email(email, people_id):
         ("Email", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
         VALUES (%s, %s, %s, now(), now())
         ''',
-        (email, str(people_id), str(company_id))
+        (email, str(people_id), company_id_param)
     )
     conn.commit()
     print("Email inserted successfully")
 
     print(f"Inserted email for PeopleId: {people_id}")
+
 
 def insert_phone(contact_no, people_id):
     # 1. Get CompanyId using PeopleId
@@ -77,6 +104,13 @@ def insert_phone(contact_no, people_id):
 
     company_id = result[0]
 
+    # Handle None company_id
+    if company_id is None:
+        print(f"CompanyId is None for PeopleId: {people_id}, inserting with NULL")
+        company_id_param = None
+    else:
+        company_id_param = str(company_id)
+
     # 2. Insert into Staging.Contact
     cur.execute(
         '''
@@ -84,14 +118,16 @@ def insert_phone(contact_no, people_id):
         ("ContactNumber", "PeopleId", "CompanyId", "CreatedAt", "UpdatedAt")
         VALUES (%s, %s, %s, now(), now())
         ''',
-        (contact_no, str(people_id), str(company_id))
+        (contact_no, str(people_id), company_id_param)
     )
     conn.commit()
     print(f"Phone inserted for PeopleId: {people_id}")
 
+
 def mark_done(ids):
     print(f" Marking people as processed: {ids}")
     cur.execute('UPDATE "Staging"."People" SET "Status" = TRUE WHERE "Id" IN %s', (tuple(ids),))
+
 
 # implementing pyautogui.
 def wait_until_found_and_click(image, confidence=0.6):
@@ -107,6 +143,7 @@ def wait_until_found_and_click(image, confidence=0.6):
         except Exception as e:
             print(f" Error locating {image}: {e}")
         time.sleep(1)
+
 
 def try_click_with_timeout(image, timeout=9, confidence=0.6):
     print(f" Trying to click {image} for {timeout}s...")
@@ -124,6 +161,7 @@ def try_click_with_timeout(image, timeout=9, confidence=0.6):
         time.sleep(1)
     print(f" Timeout: {image} not found.")
     return False
+
 
 def extract_from_current_tab(url):
     print(f"Scraping: {url}")
@@ -150,17 +188,21 @@ def extract_from_current_tab(url):
     phones = [p.strip() for p in re.findall(r"\+\d[\d\s\-()]{7,}", content)]
     return emails, phones
 
+
 def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
+
 # --- Main ---
+start_offset = get_last_index()
 profiles = fetch_pending_profiles()
 if not profiles:
     print(" No unprocessed profiles found.")
     exit()
 
 for i, chunk in enumerate(chunk_list(profiles, 3)):
+    current_batch_start = start_offset + (i * 3)
     chrome_profile = chrome_profiles[i % len(chrome_profiles)]
     urls = [row[1] for row in chunk]
     ids = [row[0] for row in chunk]
@@ -177,7 +219,8 @@ for i, chunk in enumerate(chunk_list(profiles, 3)):
     time.sleep(10)
 
     for idx, (person_id, url) in enumerate(chunk):
-        print(f"\n [Tab {idx+1}] {url}")
+        current_profile_index = current_batch_start + idx + 1
+        print(f"\n [Tab {idx + 1}] Profile {current_profile_index}: {url}")
         emails, phones = extract_from_current_tab(url)
 
         print(f" Extracted {len(emails)} emails, {len(phones)} phones")
@@ -185,6 +228,9 @@ for i, chunk in enumerate(chunk_list(profiles, 3)):
             insert_email(email, person_id)
         for phone in phones:
             insert_phone(phone, person_id)
+
+        # Save progress after each profile
+        save_current_index(current_profile_index)
 
         if idx < len(chunk) - 1:
             pyautogui.hotkey("ctrl", "tab")
