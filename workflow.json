@@ -1,0 +1,1273 @@
+{
+  "name": "final workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "search",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -580,
+        560
+      ],
+      "id": "eab2a50b-664e-4e0e-8f25-6decfb2c0fa8",
+      "name": "Webhook",
+      "webhookId": "a4b537db-ee40-42af-a3d3-1ae219505582"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fc534b5f-9494-4130-93bf-4f8bcf68a9c0",
+              "name": "=searchQuery",
+              "value": "={{$node[\"Webhook\"].json[\"query\"][\"q\"]}} in {{$node[\"Webhook\"].json[\"query\"][\"place\"]}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -140,
+        560
+      ],
+      "id": "d4bd9d3a-00ee-4873-91a3-78fb88f4875d",
+      "name": "Formalize Query"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "Raw",
+          "mode": "list",
+          "cachedResultName": "Raw"
+        },
+        "table": {
+          "__rl": true,
+          "value": "GoogleMapSearch",
+          "mode": "list",
+          "cachedResultName": "GoogleMapSearch"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "job_id": "={{ $('Public.Job').item.json.Id }}",
+            "data": "={{$json}}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_id",
+              "displayName": "job_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "uuid",
+              "displayName": "uuid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        300,
+        460
+      ],
+      "id": "343bbb75-6319-4a8d-a924-d869e9f1bcb7",
+      "name": "Raw.GoogleMapSearch",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Job",
+          "mode": "list",
+          "cachedResultName": "Job"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Prompt": "={{$json[\"query\"][\"q\"]}}+{{$json[\"query\"][\"place\"]}}",
+            "DateAndTime": "={{$now}}",
+            "SourceId": 8,
+            "NoOfPagesScraped": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Prompt",
+              "displayName": "Prompt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "NoOfPagesScraped",
+              "displayName": "NoOfPagesScraped",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DateAndTime",
+              "displayName": "DateAndTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "UUID",
+              "displayName": "UUID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "SourceId",
+              "displayName": "SourceId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "outputColumns": [
+            "Id"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -360,
+        560
+      ],
+      "id": "f9dfbf68-5d64-4363-b3e8-a105f5cfb12f",
+      "name": "Public.Job",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "Staging",
+          "mode": "list",
+          "cachedResultName": "Staging"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Contact",
+          "mode": "list",
+          "cachedResultName": "Contact"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ContactNumber": "={{ $json.organizations[0].phone || 'No phone number available' }}",
+            "CompanyId": "={{ $('Staging.CompanyData').item.json.CompanyId || 'null' }}",
+            "PeopleId": 0
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ContactNumber",
+              "displayName": "ContactNumber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PeopleId",
+              "displayName": "PeopleId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CompanyId",
+              "displayName": "CompanyId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "UUID",
+              "displayName": "UUID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        740
+      ],
+      "id": "0fde9862-3fd4-4770-8eee-e9eb9d0765f9",
+      "name": "Staging.Contact",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update \"Staging\".\"Company\" set \"CompanyURL\" = '{{$json.organizations[0].website_url }}', \"CompanyLogoURL\" = '{{ $json.organizations[0].logo_url }}'  where \"CompanyId\" = {{ $('Staging.CompanyData').item.json.CompanyId }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        540
+      ],
+      "id": "71868c74-47fc-4782-b16c-755bba60f26d",
+      "name": "CompanyFiller",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "Raw",
+          "mode": "list",
+          "cachedResultName": "Raw"
+        },
+        "table": {
+          "__rl": true,
+          "value": "ApolloSearch",
+          "mode": "list",
+          "cachedResultName": "ApolloSearch"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "JobId": "={{ $('Public.Job').item.json.Id || 'null'}}",
+            "Data": "={{$json}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "JobId",
+              "displayName": "JobId",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "UUID",
+              "displayName": "UUID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Data",
+              "displayName": "Data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CreatedAt",
+              "displayName": "CreatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "UpdatedAt",
+              "displayName": "UpdatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        360
+      ],
+      "id": "e0919f8a-9b7a-42ee-996d-e0b25d6799f7",
+      "name": "Raw.ApolloSearch",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the results array from the first input item\nconst results = $input.all()[0].json.results; // Assuming 'results' is in the first item\n\n// Loop over each place in the results array\nfor (const item of results) {\n  // Add the required fields to each item\n  item.CompanyName = item.name;\n  item.Ratings = item.rating;\n  item.CompanyLat = item.geometry?.location?.lat;\n  item.CompanyLong = item.geometry?.location?.lng;\n  item.CompanyAddress = item.formatted_address;\n\n  // Clean up unused fields\n  delete item.name;\n  delete item.rating;\n  delete item.geometry;\n  delete item.formatted_address;\n  delete item.place_id;\n  delete item.icon;\n  delete item.plus_code;\n  delete item.user_ratings_total;\n  delete item.business_status;\n  delete item.types;\n}\n\n// Return the flattened data\nreturn results.map(item => ({ json: item }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        680
+      ],
+      "id": "597ce669-4cbe-4515-8c4f-0113f5e180df",
+      "name": "Flatten Raw.Company"
+    },
+    {
+      "parameters": {
+        "url": "https://api.apollo.io/v1/organizations/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q_organization_name",
+              "value": "={{ $json.CompanyName }}"
+            },
+            {
+              "name": "Page",
+              "value": "1"
+            },
+            {
+              "name": "Per_Page",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Api-Key",
+              "value": "ZFN3xmZeZfDhyXem_X8DTQ"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        520
+      ],
+      "id": "1d5bb835-e477-4322-9efa-ac8c45b59825",
+      "name": "ApolloSearch"
+    },
+    {
+      "parameters": {
+        "url": "=https://maps.googleapis.com/maps/api/place/textsearch/json?query={{$json.searchQuery}}&key=AIzaSyBiYF9PzZff9bSCexyVbcCiV6um2qy4iGo",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "name": "PageToken",
+                    "value": "={{ $response.body.next_page_token }}"
+                  }
+                ]
+              },
+              "limitPagesFetched": true,
+              "maxRequests": 1
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        60,
+        560
+      ],
+      "id": "df45abcd-e724-4556-8b95-2b8f7e08950d",
+      "name": "GoogleMapSearch"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "Staging",
+          "mode": "list",
+          "cachedResultName": "Staging"
+        },
+        "table": {
+          "__rl": true,
+          "value": "SocialMediaProfile",
+          "mode": "list",
+          "cachedResultName": "SocialMediaProfile"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "LinkedInURL": "={{ $json.organizations[0].linkedin_url || 'null' }}",
+            "FacebookURL": "={{ $json.organizations[0].facebook_url }}",
+            "CompanyId": "={{ $('Staging.CompanyData').item.json.CompanyId || 'null' }}",
+            "TwitterURL": "={{ $json.organizations[0].twitter_url || 'null' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "UUID",
+              "displayName": "UUID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "LinkedInURL",
+              "displayName": "LinkedInURL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "FacebookURL",
+              "displayName": "FacebookURL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TwitterURL",
+              "displayName": "TwitterURL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "CompanyId",
+              "displayName": "CompanyId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CreatedAt",
+              "displayName": "CreatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "UpdatedAt",
+              "displayName": "UpdatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1060,
+        940
+      ],
+      "id": "4b568338-76e0-4afe-9075-d70a7737e7b2",
+      "name": "Staging.Socials",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1700,
+        1120
+      ],
+      "id": "81dc4df9-cff1-4347-be01-83c1140159d1",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.slice(0, 5);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        1120
+      ],
+      "id": "9a6f6bed-af30-4d29-8c14-94dac4c5968d",
+      "name": "limit"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over each company and fetch data\nfor (const item of $input.all()) {\n  const companyId = item.json.CompanyId; // Get companyId from the current input\n  const companyName = item.json.CompanyName; // Get companyName from the current input\n\n  // 10 APIs in fallback order, with the real API moved to the 4th position\n  const queries = [\n    `https://www.googleapis.com/customsearch/v1?key=AIzaSyBKlhh9o2fuYQDwqfQjlWRYSuhMVJya_k8&cx=d18f9d9f6ba854b79&q=${encodeURIComponent(companyName + ' CEO OR CTO OR COO OR CFO OR CIO OR OWNER OR DIRECTOR FINANCE OR ERP MANAGER OR DIRECTOR ERP OR PRESIDENT OR VICE PRESIDENT OR DIRECTOR IT site:linkedin.com')}`, // fake\n    `https://api2.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n    `https://api3.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n    //  Corrected real Google API call moved to 4th position\n    `https://www.googleapis.com/customsearch/v1?key=AIzaSyCw_dfEUYnAMpzU9ygHnWZ90uFuV1lvvjo&cx=d18f9d9f6ba854b79&q=${encodeURIComponent(companyName + ' CEO OR CTO OR COO OR CFO OR CIO OR OWNER OR DIRECTOR FINANCE OR ERP MANAGER OR DIRECTOR ERP OR PRESIDENT OR VICE PRESIDENT OR DIRECTOR IT site:linkedin.com')}`,\n    `https://api5.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n    `https://api6.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n    `https://api7.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n    `https://api8.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n    `https://api9.example.com/search?q=${encodeURIComponent(companyName)}`, // fake\n  ];\n\n  let result = null;\n  let attemptLogs = [];\n  let lastError = null;\n  let sourceUrl = null;\n\n  attemptLogs.push(`Starting search for company ID: ${companyId}, Company Name: ${companyName}`);\n\n  // Attempt to get data from APIs\n  for (const [index, url] of queries.entries()) {\n    try {\n      attemptLogs.push(`Attempt ${index + 1}: Trying ${url}`);\n\n      const response = await this.helpers.httpRequest({\n        method: 'GET',\n        url: url,\n        json: true,\n      });\n\n      const data = response.items || response.results || response;\n\n      if (data && Array.isArray(data) && data.length > 0) {\n        attemptLogs.push(`Success at: ${url}`);\n        \n        // Convert the result to an object format (e.g., key-value mapping)\n        // This assumes the data has a property (e.g., 'id' or another unique key)\n        result = data.reduce((acc, item, idx) => {\n          // Use 'id' or any other unique key as the key for the object\n          acc[`item_${idx + 1}`] = item;\n          return acc;\n        }, {});\n        \n        sourceUrl = url;\n        break;\n      } else {\n        attemptLogs.push(`No data at: ${url}`);\n      }\n    } catch (error) {\n      lastError = error.message;\n      attemptLogs.push(`Error at: ${url} => ${lastError}`);\n    }\n\n    await new Promise(resolve => setTimeout(resolve, 1000)); // Delay between requests\n  }\n\n  // Wrap the results and logs in a structured JSON format\n  const responseJson = {\n    companyId: companyId,\n    companyName: companyName,\n    status: result ? 'success' : 'failed',\n    result: result || {},  // Include the result as an object or an empty object\n    attemptLogs: attemptLogs, // Include all logs for the API attempts\n    error: lastError || 'All APIs failed',  // Provide error details if any\n    sourceUrl: sourceUrl || null,  // Include the URL where data was fetched from\n    myNewField: 1, // Custom field as requested\n  };\n\n  // Replace the original item JSON with the new response format\n  item.json = responseJson;\n}\n\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        960
+      ],
+      "id": "581cc678-acd1-4e62-b178-c153d79a2636",
+      "name": "Google(API)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of $input.all()) {\n  const companyId = item.json.company_id;\n  const dataItems = item.json.data;\n\n  for (const [key, value] of Object.entries(dataItems)) {\n    results.push({\n      json: {\n        company_id: companyId,\n        item_key: key,  // optional: include the original item key\n        ...value\n      }\n    });\n  }\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        1120
+      ],
+      "id": "611ad970-c9b6-4e20-acca-ba332f7dfd94",
+      "name": "flattened"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "Staging",
+          "mode": "list",
+          "cachedResultName": "Staging"
+        },
+        "table": {
+          "__rl": true,
+          "value": "People",
+          "mode": "list",
+          "cachedResultName": "People"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.title }}",
+            "LinkedIn": "={{ $json.link }}",
+            "Designation": "={{ $json.snippet }}",
+            "CompanyId": "={{ $json.company_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Id",
+              "displayName": "Id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "CompanyId",
+              "displayName": "CompanyId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "LinkedIn",
+              "displayName": "LinkedIn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Designation",
+              "displayName": "Designation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "UUID",
+              "displayName": "UUID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CreatedAt",
+              "displayName": "CreatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "UpdatedAt",
+              "displayName": "UpdatedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1280,
+        1120
+      ],
+      "id": "2ca47d10-8405-46e7-b940-2a6eddef189c",
+      "name": "insert flattened data",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT \n  c.\"CompanyId\",\n  c.\"CompanyName\",\n  c.\"CompanyURL\",\n  c.\"CompanyBusinessHours\",\n  c.\"CompanyDescription\",\n  c.\"CompanyLogoURL\",\n  c.\"CompanyAddress\",\n  c.\"CompanyLat\",\n  c.\"CompanyLong\",\n  c.\"JobId\",\n  c.\"UUID\" AS \"CompanyUUID\",\n  c.\"ratings\",\n  c.\"CreatedAt\" AS \"CompanyCreatedAt\",\n  c.\"UpdatedAt\" AS \"CompanyUpdatedAt\",\n\n  p.\"Id\" AS \"PeopleId\",\n  p.\"Name\" AS \"PeopleName\",\n  p.\"LinkedIn\" AS \"PeopleLinkedIn\",\n  p.\"Designation\" AS \"PeopleDesignation\",\n  p.\"UUID\" AS \"PeopleUUID\",\n  p.\"CreatedAt\" AS \"PeopleCreatedAt\",\n  p.\"UpdatedAt\" AS \"PeopleUpdatedAt\",\n\n  con.\"Id\" AS \"ContactId\",\n  con.\"ContactNumber\",\n  con.\"UUID\" AS \"ContactUUID\",\n  con.\"CreatedAt\" AS \"ContactCreatedAt\",\n  con.\"UpdatedAt\" AS \"ContactUpdatedAt\",\n\n  e.\"Id\" AS \"EmailId\",\n  e.\"Email\",\n  e.\"UUID\" AS \"EmailUUID\",\n  e.\"CreatedAt\" AS \"EmailCreatedAt\",\n  e.\"UpdatedAt\" AS \"EmailUpdatedAt\",\n\n  sm.\"Id\" AS \"SocialMediaProfileId\",\n  sm.\"LinkedInURL\",\n  sm.\"FacebookURL\",\n  sm.\"TwitterURL\",\n  sm.\"UUID\" AS \"SocialMediaUUID\",\n  sm.\"CreatedAt\" AS \"SocialMediaCreatedAt\",\n  sm.\"UpdatedAt\" AS \"SocialMediaUpdatedAt\"\n\nFROM (\n  SELECT *\n  FROM \"Staging\".\"Company\"\n  ORDER BY \"CreatedAt\" DESC\n) c\n\nLEFT JOIN \"Staging\".\"People\" p\n  ON c.\"CompanyId\" = p.\"CompanyId\"\n\nLEFT JOIN \"Staging\".\"Contact\" con\n  ON con.\"CompanyId\" = c.\"CompanyId\"\n\nLEFT JOIN \"Staging\".\"Email\" e\n  ON e.\"CompanyId\" = c.\"CompanyId\"\n\nLEFT JOIN \"Staging\".\"SocialMediaProfile\" sm\n  ON c.\"CompanyId\" = sm.\"CompanyId\"\n  where c.\"CompanyId\" in ({{ $json.CompanyId }})\n  ORDER BY c.\"CompanyId\" ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1480,
+        1120
+      ],
+      "id": "fedfde22-1df3-4bec-b6b6-8ef6dd206be4",
+      "name": "output",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "Staging",
+          "mode": "list",
+          "cachedResultName": "Staging"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Company",
+          "mode": "list",
+          "cachedResultName": "Company"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CompanyName": "={{ $('Flatten Raw.Company').item.json.CompanyName }}",
+            "CompanyAddress": "={{ $('Flatten Raw.Company').item.json.CompanyAddress }}",
+            "ratings": "={{ $('Flatten Raw.Company').item.json.Ratings }}",
+            "CompanyLat": "={{ $('Flatten Raw.Company').item.json.CompanyLat }}",
+            "CompanyLong": "={{ $('Flatten Raw.Company').item.json.CompanyLong }}",
+            "JobId": "={{ $('Public.Job').item.json.Id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "CompanyId",
+              "displayName": "CompanyId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CompanyName",
+              "displayName": "CompanyName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CompanyURL",
+              "displayName": "CompanyURL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CompanyBusinessHours",
+              "displayName": "CompanyBusinessHours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CompanyDescription",
+              "displayName": "CompanyDescription",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CompanyLogoURL",
+              "displayName": "CompanyLogoURL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "CompanyAddress",
+              "displayName": "CompanyAddress",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CompanyLat",
+              "displayName": "CompanyLat",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CompanyLong",
+              "displayName": "CompanyLong",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "JobId",
+              "displayName": "JobId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "UUID",
+              "displayName": "UUID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "ratings",
+              "displayName": "ratings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "outputColumns": [
+            "CompanyId",
+            "CompanyName"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        680
+      ],
+      "id": "9883b512-1307-42b6-801d-c37cc5dffce7",
+      "name": "Staging.CompanyData",
+      "executeOnce": false,
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "raw",
+          "mode": "list",
+          "cachedResultName": "raw"
+        },
+        "table": {
+          "__rl": true,
+          "value": "google_data",
+          "mode": "list",
+          "cachedResultName": "google_data"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company_id": "={{ $json.companyId }}",
+            "data": "={{ $json.result }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "company_id",
+              "displayName": "company_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "data",
+              "displayName": "data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        820,
+        1120
+      ],
+      "id": "5f84043c-a9dd-4381-b378-f30bdae8fc57",
+      "name": "People.Raw",
+      "credentials": {
+        "postgres": {
+          "id": "NHYIGWx2jzPbR0CY",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Public.Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formalize Query": {
+      "main": [
+        [
+          {
+            "node": "GoogleMapSearch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Public.Job": {
+      "main": [
+        [
+          {
+            "node": "Formalize Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Raw.Company": {
+      "main": [
+        [
+          {
+            "node": "Staging.CompanyData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ApolloSearch": {
+      "main": [
+        [
+          {
+            "node": "Staging.Contact",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CompanyFiller",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Raw.ApolloSearch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Staging.Socials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GoogleMapSearch": {
+      "main": [
+        [
+          {
+            "node": "Raw.GoogleMapSearch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Flatten Raw.Company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "limit": {
+      "main": [
+        [
+          {
+            "node": "Google(API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google(API)": {
+      "main": [
+        [
+          {
+            "node": "People.Raw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "flattened": {
+      "main": [
+        [
+          {
+            "node": "insert flattened data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert flattened data": {
+      "main": [
+        [
+          {
+            "node": "output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Staging.CompanyData": {
+      "main": [
+        [
+          {
+            "node": "limit",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ApolloSearch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "People.Raw": {
+      "main": [
+        [
+          {
+            "node": "flattened",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4577d901-5dc5-4cc4-9d58-b9bbd40eb2d5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d8a077a8e8f9d7ee97820979b570cfe10cb2fb99dc6e4287cd6b4c2a1eae7f3"
+  },
+  "id": "lSOAs8qZ86MHeH4s",
+  "tags": []
+}
